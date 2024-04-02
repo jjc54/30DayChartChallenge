@@ -1,5 +1,6 @@
 project:
   title: "30DayChartChallenge"
+  output-dir: docs
 
 editor: visual
 
