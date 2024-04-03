@@ -191,15 +191,15 @@ p_adjusted_for_print <- p +
   theme(plot.background = element_rect(fill = "white", color = NA),
         panel.background = element_rect(fill = "white", color = NA),
         text = element_text(size = 40), # Doubling base text size
-        plot.title = element_text(family = "lobster", size = 75, face = "bold", color = "darkorange"), # Much larger title
-        axis.title = element_text(size = 48), # Doubling axis titles for clarity
+        plot.title = element_text(family = "lobster", size = 95, face = "bold", color = "darkorange"), # Much larger title
+        axis.title = element_text(size = 60), # Doubling axis titles for clarity
         axis.title.y = element_text(margin = margin(r = 40)), # Add right margin to y-axis title for better spacing
-        axis.text.x = element_text(angle = 45, hjust = 1, size = 40), # Much larger x-axis text
-        axis.text.y = element_text(size = 40), # Much larger y-axis text
-        legend.title = element_text(size = 40), # Much larger legend title
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 50), # Much larger x-axis text
+        axis.text.y = element_text(size = 50), # Much larger y-axis text
+        legend.title = element_text(size = 50), # Much larger legend title
         legend.text = element_text(size = 36), # Much larger legend text
         plot.margin = margin(40, 40, 40, 40)) + # Adjust plot margins for better framing
-  geom_label(aes(label = scales::comma(total_enrollment)), nudge_y = 30000, size = 8, # Adjust label sizes
+  geom_label(aes(label = scales::comma(total_enrollment)), nudge_y = 30000, size = 14, # Adjust label sizes
              label.padding = unit(0.5, "lines"), color = "black", fill = "#F0E442")
 
 ggsave("chart_2.png", plot = p_adjusted_for_print, width = 16, height = 9, dpi = 300, bg = "white")
