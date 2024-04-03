@@ -34,7 +34,9 @@ Charts in this challenge utilized a publicly available dataset that was extracte
 ```{r}
 #| warning: false
 
-clinical_trials_fl <- readRDS("data/query_results_clean_final_mesh.rds")
+clinical_trials_fl <- readRDS("data/query_results_fl_clean_final.rds")
+clinical_trials_fl_mesh <- readRDS("data/query_results_fl_clean_final_mesh.rds")
+clinical_trials_fl_mesh_neo_joined <- readRDS("data/clinical_trials_fl_mesh_neo_joined.rds")
 ```
 
 # Comparisons
@@ -60,7 +62,7 @@ library(RColorBrewer)
 #str(clinical_trials_fl)
 
 # Step 1: Calculate frequencies for each mesh_term
-clinical_trials_freq <- clinical_trials_fl %>%
+clinical_trials_freq <- clinical_trials_fl_mesh %>%
   filter(!is.na(mesh_term)) %>%
   count(mesh_term) %>%
   mutate(total = sum(n), Proportion = n / total) %>%
@@ -93,4 +95,111 @@ ggplot(top_25_mesh_terms, aes(area = n, fill = Proportion, label = label)) +
         plot.caption = element_text(size = 10, color = "black"))
 
 ggsave("chart_1.png", width = 16, height = 9, dpi = 300)
+```
+
+### 2. Neo
+
+Interestingly, yesterday's analysis revealed that the most frequent MeSH term studied in Florida was [**neoplasms**]{.underline}. Let's see how many patients in Florida are receiving neoplasm treatment through clinical research studies. Importantly, a distinction should be made between [**interventional**]{.underline} studies (i.e., those with a drug, device, or other treatment being administered), and [**observational**]{.underline} studies (no treatment administered).
+
+```{r}
+#| label: Neo
+#| warning: false
+
+packages <- c("tidyverse", "RColorBrewer", "showtext")
+
+if (any(!sapply(packages, requireNamespace, quietly = TRUE))) {
+  install.packages(packages[!sapply(packages, requireNamespace, quietly = TRUE)])
+}
+
+library(tidyverse)
+library(RColorBrewer)
+library(showtext)
+
+# A Florida-esque font from Google
+font_add_google("Lobster", "lobster")
+showtext_auto()
+
+# Filter for the top MeSH term
+clinical_trials_fl_mesh_neo <- clinical_trials_fl_mesh %>%
+  filter(mesh_term == "Neoplasms") %>%
+  group_by(mesh_term) %>%
+  distinct(nct_id)
+
+# Retrieve original features
+clinical_trials_fl_distinct <- clinical_trials_fl %>%
+  select(c(1, 4, 9, 10, 11, 12, 13, 16, 17, 18, 38, 39)) %>%
+  distinct()
+
+# Join the dataframes on nct_id
+clinical_trials_fl_mesh_neo_joined <- clinical_trials_fl_distinct %>%
+  inner_join(clinical_trials_fl_mesh_neo, by = "nct_id")
+
+# Clean enrollment data
+clinical_trials_fl_mesh_neo_joined <- clinical_trials_fl_mesh_neo_joined %>%
+  mutate(
+    enrollment_actual = if_else(enrollment_type == "Actual", enrollment, NA_integer_),
+    enrollment_anticipated = if_else(enrollment_type == "Anticipated", enrollment, NA_integer_)
+  )
+
+# Clean study status
+clinical_trials_fl_mesh_neo_joined <- clinical_trials_fl_mesh_neo_joined %>%
+  mutate(overall_status = case_when(
+    overall_status %in% c("Completed", "Approved for marketing") ~ "Completed",
+    overall_status %in% c("Withdrawn", "Terminated", "Suspended", "No longer available") ~ "Not Completed",
+    # Assuming any other status as "In Progress"
+    TRUE ~ "In Progress"
+  ))
+
+clinical_trials_fl_mesh_neo_joined <- clinical_trials_fl_mesh_neo_joined %>%
+  select(-c(enrollment, enrollment_type, enrollment_anticipated))
+
+# Summarize total enrollment_actual by study_type
+enrollment_by_study_type <- clinical_trials_fl_mesh_neo_joined %>%
+  group_by(study_type) %>%
+  summarise(total_enrollment = sum(enrollment_actual, na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(desc(total_enrollment))
+
+# Retrieve the Oranges palette
+oranges_palette <- brewer.pal(n = 9, name = "Oranges")
+
+# Lollipop chart with Oranges palette
+p <- ggplot(enrollment_by_study_type, aes(x = reorder(study_type, total_enrollment), y = total_enrollment)) +
+  geom_segment(aes(xend = study_type, yend = 0), color = oranges_palette[3], size = 1) + # Stems with a specific orange shade
+  geom_point(aes(fill = total_enrollment), size = 5, color = "darkorange", shape = 21) + # Dots at the end of stems
+  coord_flip() + # Flip coordinates to make it horizontal
+  scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(n = 10)) +
+  scale_fill_gradientn(colours = oranges_palette) + # Gradient fill for dots
+  labs(title = "Total Neoplasm Enrollment by Study Type",
+       x = "",
+       y = "Total Enrollment") +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"),
+        panel.grid.minor.y = element_blank(),
+        plot.title = element_text(family = "lobster", face = "bold", size = 20, color = "darkorange"),
+        axis.title.y = element_text(size = 16, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+        legend.position = "none") +
+  geom_label(aes(label = scales::comma(total_enrollment)), nudge_y = 30000, size = 4, label.padding = unit(0.25, "lines"),
+             color = "black", fill = "#F0E442") # Adding labels to the points for direct readability
+
+p
+
+# Adjusting the plot with much larger text sizes for better readability when saving
+p_adjusted_for_print <- p + 
+  theme(plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA),
+        text = element_text(size = 40), # Doubling base text size
+        plot.title = element_text(family = "lobster", size = 75, face = "bold", color = "darkorange"), # Much larger title
+        axis.title = element_text(size = 48), # Doubling axis titles for clarity
+        axis.title.y = element_text(margin = margin(r = 40)), # Add right margin to y-axis title for better spacing
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 40), # Much larger x-axis text
+        axis.text.y = element_text(size = 40), # Much larger y-axis text
+        legend.title = element_text(size = 40), # Much larger legend title
+        legend.text = element_text(size = 36), # Much larger legend text
+        plot.margin = margin(40, 40, 40, 40)) + # Adjust plot margins for better framing
+  geom_label(aes(label = scales::comma(total_enrollment)), nudge_y = 30000, size = 8, # Adjust label sizes
+             label.padding = unit(0.5, "lines"), color = "black", fill = "#F0E442")
+
+ggsave("chart_2.png", plot = p_adjusted_for_print, width = 16, height = 9, dpi = 300, bg = "white")
 ```
