@@ -204,3 +204,124 @@ p_adjusted_for_print <- p +
 
 ggsave("chart_2.png", plot = p_adjusted_for_print, width = 16, height = 9, dpi = 300, bg = "white")
 ```
+
+### 3. Makeover
+
+The prompt for today was "Makeover." \
+\
+TLDR; I started programming with SAS and didn't make my first R/ggplot2 plot until I was in my second semester of my master's program for data science. That first "real" plot was in CAP 5990 Tools for Data Science at [University of West Florida](https://www.linkedin.com/company/uwf/) with Dr. [Achraf Cohen](https://www.linkedin.com/in/achraf-cohen-94047421/) as part of our final project. Here's the prompt we were given:
+
+> Plot the boxplot of the departure delays vs the name of airlines where the destination is ATL airport. Solve this question using R and Python.
+
+\
+And here's the original plot (in R/ggplot2), and the makeover from today (also in R/ggplot2):
+
+```{r}
+#| label: firstplot
+#| warning: false
+
+packages <- c("tidyverse", "nycflights13")
+
+if (any(!sapply(packages, requireNamespace, quietly = TRUE))) {
+  install.packages(packages[!sapply(packages, requireNamespace, quietly = TRUE)])
+}
+
+library(tidyverse)
+library(nycflights13)
+library(showtext)
+library(sysfonts)
+
+# A Florida-esque font from Google
+font_add_google("JetBrains Mono", "JetBrains Mono")
+showtext_auto()
+
+flights <- nycflights13::flights
+airlines <- nycflights13::airlines
+
+#?flights - arr_delay is in minutes; negatives are early arrivals
+
+complete <- inner_join(flights, airlines)
+
+atl_delays <- complete %>%
+  select(name, dest, dep_delay) %>%
+  drop_na() %>%
+  filter(dest=="ATL") 
+
+atl_delays_summary <- aggregate(atl_delays$dep_delay, list(atl_delays$name), FUN=mean)
+
+atl_delays_summary <- atl_delays_summary %>% #Sorting by lowest to highest delay time, renaming and adding units to the dataframe
+  arrange(x) %>%
+  rename("Airline" = "Group.1") %>%
+  rename("Departure  Delays (minutes)" = "x")
+
+print(atl_delays_summary)
+
+ggplot(atl_delays, aes(x=name, y=dep_delay)) + 
+    geom_boxplot(fill="slateblue", alpha=0.2) + 
+    xlab("Airline") + 
+    ylab("Departure Delays for ATL (minutes)")
+
+ggsave("firstplot.png")
+
+#max(ATL_ddelays$dep_delay); FIX SCALE ISSUE IF TIME
+```
+
+Now that I know a little more about R and ggplot2, let's give this plot a makeover. I even made a comment about fixing the scale issue, so let's start with that and move forward!
+
+```{r}
+#| label: makeover
+#| warning: false
+
+str(atl_delays)
+
+# Converting dep_delay from minutes to hours
+atl_delays <- atl_delays %>%
+  mutate(dep_delay_hours = dep_delay / 60)
+
+ggplot(atl_delays, aes(x = name, y = dep_delay_hours)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, fill = "white") + # Adding a small boxplot inside for summary statistics
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Airline Name", y = "Departure Delay (Hours)", title = "Departure Delay Distribution by Airline") +
+  scale_y_continuous(labels = scales::unit_format(unit = "h", scale = 1))
+
+p <- ggplot(atl_delays, aes(x = name, y = dep_delay_hours, fill = name)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, fill = "white") +
+  scale_y_log10(labels = scales::math_format(10^.x)) + # Applying a logarithmic scale
+  scale_fill_manual(values = c(
+    "Endeavor Air Inc." = "#0033A0",  # Delta/Endeavor Navy Blue
+    "Southwest Airlines Co." = "#3077A8",  # Southwest Canyon Blue
+    "Envoy Air" = "#FA1D2F",  # Envoy/American Red
+    "Delta Air Lines Inc." = "#0033A0",  # Delta Navy Blue
+    "United Air Lines Inc." = "#1C56A5",  # United Rhapsody Blue
+    "AirTran Airways Corporation" = "#008080",  # AirTran Teal
+    "ExpressJet Airlines Inc." = "#005DAA"  # ExpressJet Blue
+  )) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_blank(),
+        plot.title = element_text(face = "bold", family = "JetBrains Mono", size = 20),
+        legend.position = "none") +
+  labs(y = "Departure Delay (Log Hours)",
+       title = "Explore the Skies: Departure Delay Patterns by Airline",
+       caption = "Data Source: R package 'nycflights13'.") +
+  coord_flip()
+
+p
+
+# Adjusting the plot with much larger text sizes for better readability when saving
+p_adjusted_for_print <- p + 
+  theme(plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA),
+        text = element_text(size = 40), # Doubling base text size
+        plot.title = element_text(family = "JetBrains Mono", size = 95, face = "bold"), # Much larger title
+        axis.title = element_text(size = 60), # Doubling axis titles for clarity
+        axis.title.y = element_blank(), # Add right margin to y-axis title for better spacing
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 50), # Much larger x-axis text
+        axis.text.y = element_text(size = 50), # Much larger y-axis text
+        legend.title = element_text(size = 50), # Much larger legend title
+        plot.margin = margin(40, 40, 40, 40)) # Adjust plot margins for better framing
+
+ggsave("chart_3.png", plot = p_adjusted_for_print, width = 18, height = 9, dpi = 300, bg = "white")
+```
